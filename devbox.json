@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
+  "packages": [
+    "terraform",
+    "awscli2"
+  ],
+  "env": {
+    "TF_VAR_creator": "$USER",
+    "AWS_PAGER": "",
+    "AWS_PROFILE": "coreylivin",
+    "TF_VAR_jw_owner": "$USER"
+  },
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to devbox!' > /dev/null"
+    ],
+    "scripts": {
+      "test": [
+        "echo \"Error: no test specified\" && exit 1"
+      ]
+    }
+  }
+}

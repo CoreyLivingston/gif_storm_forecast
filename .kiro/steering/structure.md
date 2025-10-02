@@ -10,10 +10,19 @@
 │   └── slideshow.js       # Core slideshow class and logic
 ├── sample_gifs/           # Local development GIF assets
 │   ├── 1.gif, 3.gif, etc # Sample GIFs for testing
-├── deploy/                # AWS deployment configuration
-│   ├── s3-setup.md       # Deployment instructions
+├── deploy/                # Manual AWS deployment configuration (legacy)
+│   ├── s3-setup.md       # Manual deployment instructions
 │   └── bucket-policy.json # S3 bucket policy template
-└── README.md              # Project documentation
+├── terraform/             # Infrastructure-as-Code configuration (primary)
+│   ├── main.tf           # Core infrastructure resources
+│   ├── variables.tf      # Input variables with validation
+│   ├── outputs.tf        # Output values for deployment info
+│   ├── versions.tf       # Provider and Terraform version constraints
+│   ├── terraform.tfvars.example # Example configuration file
+│   └── README.md         # Comprehensive Terraform documentation
+├── devbox.json            # Development environment configuration
+├── devbox.lock            # Locked development dependencies
+└── README.md              # Project documentation with deployment options
 ```
 
 ## Code Organization Patterns
@@ -36,13 +45,34 @@
 - Object-fit for responsive image scaling
 - Utility classes for state management (e.g., `hide-cursor`)
 
+### Infrastructure Code Patterns
+- **Terraform Structure**: Modular configuration with separate files for resources, variables, and outputs
+- **Variable Validation**: Comprehensive validation rules for all input parameters
+- **Resource Naming**: Consistent naming with project/environment prefixes
+- **Tagging Strategy**: Standardized tags for cost tracking and resource management
+
 ### File Naming
 - Kebab-case for HTML/CSS files and directories
 - camelCase for JavaScript variables and functions
 - Numbered GIF files (1.gif, 3.gif, etc.)
 - Descriptive names for configuration files
+- snake_case for Terraform variables and resources
 
-## Development vs Production
+## Deployment Patterns
+
+### Development Environment
 - Local mode: serves from `./sample_gifs/` directory
+- Devbox environment with pre-configured tools
+- S3-only infrastructure for cost optimization
+
+### Production Environment
 - Production mode: fetches from configured S3 bucket URL
-- Same codebase handles both environments via configuration
+- Optional CloudFront CDN for performance and HTTPS
+- Multi-environment support (dev/staging/prod)
+- Automated deployment with Terraform
+
+### Infrastructure Management
+- **Primary**: Terraform for automated, repeatable deployments
+- **Legacy**: Manual AWS CLI deployment for simple use cases
+- **Cost-optimized**: Configurable S3-only or S3+CloudFront setups
+- **Multi-environment**: Workspace-based environment isolation

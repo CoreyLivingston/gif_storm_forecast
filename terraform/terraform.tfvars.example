@@ -1,0 +1,33 @@
+# Example Terraform variables configuration
+# Copy this file to terraform.tfvars and customize the values
+
+# S3 bucket name (optional - will be auto-generated if not provided)
+# bucket_name = "my-gif-storm-forecast-bucket"
+
+# AWS region for deployment
+aws_region = "us-east-1"
+
+# Environment name for tagging and resource naming
+environment = "dev"
+
+# Project name for resource naming and tagging
+project_name = "gif-storm-forecast"
+
+# Enable CloudFront CDN for improved performance and HTTPS
+# Note: CloudFront deployment takes 15+ minutes and incurs additional costs
+enable_cloudfront = false
+
+# Example configurations for different environments:
+
+# Development environment (minimal cost)
+# environment = "dev"
+# enable_cloudfront = false
+
+# Staging environment (with CDN for testing)
+# environment = "staging"
+# enable_cloudfront = true
+
+# Production environment (with CDN for performance)
+# environment = "prod"
+# enable_cloudfront = true
+# aws_region = "us-east-1"
