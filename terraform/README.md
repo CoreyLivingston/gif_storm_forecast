@@ -1,13 +1,14 @@
 # GIF Storm Forecast - Terraform Infrastructure
 
-This directory contains Terraform configuration to deploy the GIF Storm Forecast application as a cost-effective static website on AWS using S3 and optional CloudFront CDN.
+This directory contains Terraform configuration to deploy the GIF Storm Forecast application as a secure static website on AWS using a private S3 bucket with mandatory CloudFront CDN for HTTPS-only content delivery.
 
 ## Overview
 
-The infrastructure creates:
-- **S3 Bucket**: Static website hosting for the application and GIF assets
-- **S3 Bucket Policy**: Public read access for website content
-- **CloudFront Distribution** (Optional): CDN for improved performance and HTTPS support
+The infrastructure creates a secure architecture with:
+- **Private S3 Bucket**: Secure storage for the application and GIF assets (no public access)
+- **CloudFront Distribution**: Mandatory CDN for HTTPS-only content delivery and performance
+- **Origin Access Control (OAC)**: Secure authentication between CloudFront and S3
+- **S3 Bucket Policy**: Restrictive policy allowing only CloudFront OAC access
 
 ## Prerequisites
 
@@ -18,119 +19,129 @@ The infrastructure creates:
 ### AWS Account Requirements
 - Active AWS account with billing enabled
 - AWS CLI configured with appropriate credentials
-- Required AWS permissions (see [IAM Permissions](#iam-permissions) section)
+- Required AWS permissions including CloudFront (see [IAM Permissions](#iam-permissions) section)
 
 ### Cost Considerations
-- **S3 Only**: ~$0.50-2.00/month (depending on traffic and storage)
-- **S3 + CloudFront**: ~$1.00-5.00/month (additional CDN costs)
+- **Secure CloudFront + Private S3**: ~$1.00-5.00/month (includes CDN and security features)
+- CloudFront is mandatory for security - no S3-only option available
 - See [Cost Optimization](#cost-optimization) section for detailed breakdown
 
 ## Quick Start
 
-### 1. Configure Variables
+### Secure HTTPS-Only Deployment
+
+The infrastructure automatically creates a secure setup with private S3 and mandatory CloudFront:
+
 ```bash
-# Copy example variables file
+# 1. Configure deployment (optional - uses secure defaults)
 cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars to customize bucket name, region, etc.
 
-# Edit terraform.tfvars with your preferred settings
-nano terraform.tfvars
-```
-
-### 2. Deploy Infrastructure
-```bash
-# Initialize Terraform
+# 2. Deploy secure infrastructure
 terraform init
-
-# Review planned changes
-terraform plan
-
-# Deploy infrastructure
 terraform apply
-```
 
-### 3. Upload Website Content
-```bash
-# Get bucket name from Terraform output
+# 3. Upload website content to private S3 bucket
 BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+cd ../web_app
+aws s3 sync . s3://$BUCKET_NAME/
 
-# Upload website files from project root
-cd ..
-aws s3 sync . s3://$BUCKET_NAME/ \
-  --exclude "*.md" \
-  --exclude "deploy/*" \
-  --exclude ".git/*" \
-  --exclude "terraform/*"
+# 4. Get your secure HTTPS website URL
+cd ../terraform
+terraform output website_url
+# This will show the CloudFront HTTPS URL (e.g., https://d1234567890abc.cloudfront.net)
+
+# 5. Update application config for production
+# Edit js/config.js: set DEVELOPMENT_MODE = false
+# Set S3_BUCKET_URL to the CloudFront URL from step 4
 ```
 
-### 4. Access Your Website
-```bash
-# Get website URL
-terraform output s3_website_url
+### Deployment Notes
+- **CloudFront deployment takes 15-20 minutes** - this is normal for AWS CDN setup
+- **HTTPS is enforced** - HTTP requests automatically redirect to HTTPS
+- **S3 bucket is private** - content is only accessible through CloudFront
+- **No direct S3 access** - Origin Access Control (OAC) provides secure authentication
 
-# If CloudFront is enabled
-terraform output cloudfront_url
-```
+## Security and Performance Features
+
+The secure architecture automatically includes:
+
+1. **HTTPS Enforcement**: All HTTP requests redirect to HTTPS for security
+2. **Private S3 Storage**: Content is never directly accessible from the internet
+3. **Origin Access Control**: Secure authentication between CloudFront and S3
+4. **Global CDN**: CloudFront edge locations provide fast content delivery worldwide
+5. **Optimized Caching**: GIFs cached for 30 days, HTML for 1 hour
+6. **Gzip Compression**: Automatic compression for faster loading
+
+### Performance Optimization
+- **CloudFront CDN**: Global edge locations reduce latency
+- **Optimized cache headers**: Long-term caching for static assets
+- **Secure delivery**: HTTPS provides better browser performance
+- **GIF optimization**: Keep individual GIFs under 10MB for best performance
 
 ## Configuration Options
 
 ### Basic Configuration (terraform.tfvars)
 ```hcl
-# Minimal setup for development
+# Secure setup for development
 aws_region = "us-east-1"
 environment = "dev"
 project_name = "gif-storm-forecast"
-enable_cloudfront = false
+# CloudFront is always enabled for security
 ```
 
 ### Production Configuration
 ```hcl
-# Production setup with CDN
+# Secure production setup
 aws_region = "us-east-1"
 environment = "prod"
 project_name = "gif-storm-forecast"
-enable_cloudfront = true
 bucket_name = "my-company-gif-storm-prod"
+# CloudFront is mandatory - no enable_cloudfront variable needed
 ```
 
 ## Deployment Scenarios
 
-### Scenario 1: Development/Testing (Minimal Cost)
+### Scenario 1: Development/Testing (Secure)
 **Use Case**: Local development, testing, proof of concept
 **Configuration**:
 ```hcl
 environment = "dev"
-enable_cloudfront = false
+aws_region = "us-east-1"
+# CloudFront is always enabled for security
 ```
-**Expected Cost**: ~$0.50-1.00/month
-**Deployment Time**: 2-3 minutes
+**Expected Cost**: ~$1.00-2.00/month
+**Deployment Time**: 15-20 minutes (CloudFront distribution)
 
-### Scenario 2: Production (Performance Optimized)
+### Scenario 2: Production (Secure & Performance Optimized)
 **Use Case**: Public-facing deployment, kiosk displays
 **Configuration**:
 ```hcl
 environment = "prod"
-enable_cloudfront = true
 aws_region = "us-east-1"  # Closest to your users
+bucket_name = "my-company-gif-storm-prod"
 ```
 **Expected Cost**: ~$2.00-5.00/month
 **Deployment Time**: 15-20 minutes (CloudFront distribution)
 
 ### Scenario 3: Multi-Environment Setup
-Deploy separate environments for development, staging, and production:
+Deploy separate secure environments for development, staging, and production:
 
 ```bash
 # Development
 terraform workspace new dev
-terraform apply -var="environment=dev" -var="enable_cloudfront=false"
+terraform apply -var="environment=dev"
 
 # Staging
 terraform workspace new staging  
-terraform apply -var="environment=staging" -var="enable_cloudfront=true"
+terraform apply -var="environment=staging"
 
 # Production
 terraform workspace new prod
-terraform apply -var="environment=prod" -var="enable_cloudfront=true"
+terraform apply -var="environment=prod" -var="bucket_name=company-gif-storm-prod"
 ```
+
+**Note**: All environments use the same secure architecture with private S3 and mandatory CloudFront.
 
 ## Variable Reference
 
@@ -140,7 +151,8 @@ terraform apply -var="environment=prod" -var="enable_cloudfront=true"
 | `aws_region` | string | "us-east-1" | AWS region for deployment |
 | `environment` | string | "dev" | Environment name for tagging |
 | `project_name` | string | "gif-storm-forecast" | Project name for resource naming |
-| `enable_cloudfront` | bool | false | Enable CloudFront CDN |
+
+**Note**: CloudFront is always enabled for security - no `enable_cloudfront` variable needed.
 
 ### Variable Validation Rules
 - **bucket_name**: 3-63 characters, lowercase letters/numbers/hyphens only
@@ -154,18 +166,18 @@ After successful deployment, Terraform provides these outputs:
 
 | Output | Description | Example |
 |--------|-------------|---------|
-| `s3_bucket_name` | Created S3 bucket name | `gif-storm-forecast-dev-a1b2c3d4` |
-| `s3_website_endpoint` | S3 website endpoint | `bucket.s3-website-us-east-1.amazonaws.com` |
-| `s3_website_url` | Complete S3 website URL | `http://bucket.s3-website-us-east-1.amazonaws.com` |
+| `s3_bucket_name` | Created private S3 bucket name | `gif-storm-forecast-dev-a1b2c3d4` |
+| `website_url` | Primary HTTPS website URL (CloudFront) | `https://d1234567890abc.cloudfront.net` |
 | `cloudfront_distribution_id` | CloudFront distribution ID | `E1234567890ABC` |
 | `cloudfront_domain_name` | CloudFront domain name | `d1234567890abc.cloudfront.net` |
-| `cloudfront_url` | Complete CloudFront URL | `https://d1234567890abc.cloudfront.net` |
-| `deployment_instructions` | Step-by-step upload instructions | Multi-line deployment guide |
+| `origin_access_control_id` | OAC ID for CloudFront-S3 integration | `E1234567890XYZ` |
+
+**Note**: S3 website endpoints are not exposed since the bucket is private and only accessible through CloudFront.
 
 ## IAM Permissions
 
 ### Minimum Required Permissions
-Your AWS credentials need these permissions:
+Your AWS credentials need these permissions for the secure architecture:
 
 ```json
 {
@@ -178,10 +190,8 @@ Your AWS credentials need these permissions:
         "s3:DeleteBucket",
         "s3:GetBucketLocation",
         "s3:GetBucketPolicy",
-        "s3:GetBucketWebsite",
         "s3:ListBucket",
         "s3:PutBucketPolicy",
-        "s3:PutBucketWebsite",
         "s3:PutBucketPublicAccessBlock",
         "s3:GetBucketPublicAccessBlock",
         "s3:DeleteBucketPolicy",
@@ -192,13 +202,33 @@ Your AWS credentials need these permissions:
         "arn:aws:s3:::*gif-storm-forecast*",
         "arn:aws:s3:::*gif-storm-forecast*/*"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:ListDistributions",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:ListOriginAccessControls"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
 
-### Additional Permissions for CloudFront
-If using CloudFront (`enable_cloudfront = true`):
+**Note**: S3 website hosting permissions are not needed since the bucket is private.
+
+### Required CloudFront Permissions
+CloudFront is mandatory for security, so these permissions are always required:
 
 ```json
 {
@@ -211,7 +241,11 @@ If using CloudFront (`enable_cloudfront = true`):
     "cloudfront:ListDistributions",
     "cloudfront:UpdateDistribution",
     "cloudfront:TagResource",
-    "cloudfront:UntagResource"
+    "cloudfront:UntagResource",
+    "cloudfront:CreateOriginAccessControl",
+    "cloudfront:DeleteOriginAccessControl",
+    "cloudfront:GetOriginAccessControl",
+    "cloudfront:ListOriginAccessControls"
   ],
   "Resource": "*"
 }
@@ -283,10 +317,12 @@ terraform init
 #### 4. Website Not Accessible
 **Error**: 403 Forbidden or connection refused
 **Solution**:
-- Verify bucket policy allows public read access
-- Check S3 public access block settings
-- Ensure files are uploaded to bucket
-- Wait for DNS propagation (up to 24 hours)
+- Verify CloudFront distribution is deployed (takes 15-20 minutes)
+- Check Origin Access Control (OAC) configuration
+- Ensure files are uploaded to the private S3 bucket
+- Verify S3 bucket policy allows CloudFront OAC access
+- Wait for CloudFront deployment to complete
+- Use CloudFront URL, not S3 website endpoint
 
 ### Debugging Commands
 ```bash
@@ -312,13 +348,51 @@ terraform output s3_website_url
 
 Before deploying infrastructure, validate your Terraform configuration:
 
-#### 1. Terraform Configuration Validation
+#### 1. Terraform Configuration Validation Commands
 ```bash
-# Validate syntax and configuration
+# Basic syntax and configuration validation
 terraform validate
 
 # Expected output:
 # Success! The configuration is valid.
+
+# Validate with formatting check
+terraform fmt -check -recursive
+
+# Expected output: (no output means files are properly formatted)
+
+# Validate configuration with initialization
+terraform init
+terraform validate
+
+# Validate specific configuration files
+terraform validate -json | jq '.valid'
+# Expected output: true
+
+# Check for deprecated syntax or features
+terraform validate -no-color
+```
+
+#### 2. Terraform Plan Validation for Secure Architecture
+```bash
+# Validate secure development deployment
+terraform plan \
+  -var="environment=dev" \
+  -var="project_name=gif-storm-forecast"
+
+# Validate secure production deployment
+terraform plan \
+  -var="environment=prod" \
+  -var="project_name=gif-storm-forecast" \
+  -var="bucket_name=my-unique-bucket-name"
+
+# Validate with detailed output
+terraform plan -detailed-exitcode
+
+# Expected exit codes:
+# 0 = No changes needed
+# 1 = Error occurred
+# 2 = Changes needed (normal for new deployment)
 ```
 
 #### 2. Variable Validation Testing
@@ -344,116 +418,140 @@ terraform plan -var="project_name=aws-project"
 
 #### 3. Successful Validation Examples
 ```bash
-# Valid S3-only configuration
+# Valid secure development configuration
 terraform plan \
   -var="aws_region=us-east-1" \
   -var="environment=dev" \
-  -var="project_name=gif-storm-forecast" \
-  -var="enable_cloudfront=false"
+  -var="project_name=gif-storm-forecast"
 
-# Valid CloudFront configuration
+# Valid secure production configuration with custom bucket
 terraform plan \
   -var="aws_region=us-west-2" \
   -var="environment=prod" \
   -var="project_name=my-gif-app" \
-  -var="enable_cloudfront=true" \
   -var="bucket_name=my-unique-gif-bucket-2024"
 ```
 
 ### Deployment Testing
 
-#### Test Scenario 1: S3-Only Deployment
-**Purpose**: Validate minimal cost deployment for development/testing
+#### Test Scenario 1: Secure Development Deployment
+**Purpose**: Validate secure deployment for development/testing
 
 ```bash
 # 1. Create test configuration
-cat > test-s3-only.tfvars << EOF
+cat > test-dev.tfvars << EOF
 aws_region = "us-east-1"
 environment = "test"
 project_name = "gif-storm-test"
-enable_cloudfront = false
 EOF
 
 # 2. Plan deployment
-terraform plan -var-file="test-s3-only.tfvars"
+terraform plan -var-file="test-dev.tfvars"
 
 # 3. Expected resources in plan:
 # - aws_s3_bucket.website
-# - aws_s3_bucket_website_configuration.website
 # - aws_s3_bucket_public_access_block.website
 # - aws_s3_bucket_policy.website
+# - aws_cloudfront_origin_access_control.website
+# - aws_cloudfront_distribution.website
 # - random_id.bucket_suffix
 
-# 4. Deploy (optional - will create real resources)
-terraform apply -var-file="test-s3-only.tfvars" -auto-approve
+# 4. Deploy (optional - will create real resources, takes 15-20 minutes)
+terraform apply -var-file="test-dev.tfvars" -auto-approve
 
 # 5. Validate outputs
 terraform output s3_bucket_name
-terraform output s3_website_url
-# CloudFront outputs should be null
-terraform output cloudfront_url
+terraform output website_url  # CloudFront HTTPS URL
+terraform output cloudfront_distribution_id
+terraform output origin_access_control_id
 
-# 6. Test website accessibility
-curl -I $(terraform output -raw s3_website_url)
-# Expected: HTTP 404 (bucket exists but no content uploaded)
+# 6. Test HTTPS enforcement functionality
+WEBSITE_URL=$(terraform output -raw website_url)
+echo "Testing HTTPS enforcement..."
+curl -I $WEBSITE_URL
+# Expected: HTTP 200 or 404 (CloudFront works via HTTPS)
 
-# 7. Cleanup
-terraform destroy -var-file="test-s3-only.tfvars" -auto-approve
+# Test HTTP to HTTPS redirect
+HTTP_URL=$(echo $WEBSITE_URL | sed 's/https:/http:/')
+curl -I $HTTP_URL
+# Expected: HTTP 301/302 redirect to HTTPS
+
+# 7. Test Origin Access Control (OAC) functionality
+echo "Testing OAC functionality..."
+BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+curl -I "https://$BUCKET_NAME.s3.amazonaws.com/index.html"
+# Expected: HTTP 403 (access denied - bucket is private, OAC working)
+
+# Test that CloudFront can access S3 through OAC
+curl -I "$WEBSITE_URL/index.html"
+# Expected: HTTP 404 (CloudFront can access S3, but no content uploaded)
+
+# 8. Cleanup
+terraform destroy -var-file="test-dev.tfvars" -auto-approve
 ```
 
-#### Test Scenario 2: CloudFront Deployment
-**Purpose**: Validate full-featured deployment with CDN
+#### Test Scenario 2: Secure Production Deployment
+**Purpose**: Validate secure production deployment with custom bucket name
 
 ```bash
 # 1. Create test configuration
-cat > test-cloudfront.tfvars << EOF
+cat > test-prod.tfvars << EOF
 aws_region = "us-west-2"
 environment = "staging"
 project_name = "gif-storm-staging"
-enable_cloudfront = true
 bucket_name = "gif-storm-test-$(date +%s)"
 EOF
 
 # 2. Plan deployment
-terraform plan -var-file="test-cloudfront.tfvars"
+terraform plan -var-file="test-prod.tfvars"
 
 # 3. Expected resources in plan:
-# - All S3 resources from Scenario 1
-# - aws_cloudfront_distribution.website[0]
+# - aws_s3_bucket.website (with custom name)
+# - aws_s3_bucket_public_access_block.website
+# - aws_s3_bucket_policy.website (with OAC permissions)
+# - aws_cloudfront_origin_access_control.website
+# - aws_cloudfront_distribution.website
+# - random_id.bucket_suffix
 
 # 4. Deploy (optional - takes 15-20 minutes)
-terraform apply -var-file="test-cloudfront.tfvars" -auto-approve
+terraform apply -var-file="test-prod.tfvars" -auto-approve
 
 # 5. Validate outputs
 terraform output s3_bucket_name
-terraform output s3_website_url
+terraform output website_url  # HTTPS CloudFront URL
 terraform output cloudfront_distribution_id
 terraform output cloudfront_domain_name
-terraform output cloudfront_url
+terraform output origin_access_control_id
 
-# 6. Test both endpoints
-curl -I $(terraform output -raw s3_website_url)
-curl -I $(terraform output -raw cloudfront_url)
+# 6. Test secure access
+curl -I $(terraform output -raw website_url)
+# Expected: HTTP 404 (CloudFront works, no content)
 
-# 7. Cleanup
-terraform destroy -var-file="test-cloudfront.tfvars" -auto-approve
+# 7. Verify S3 is private
+BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+curl -I "https://$BUCKET_NAME.s3.amazonaws.com/"
+# Expected: HTTP 403 (access denied - private bucket)
+
+# 8. Cleanup
+terraform destroy -var-file="test-prod.tfvars" -auto-approve
 ```
 
 #### Test Scenario 3: Multi-Environment Deployment
-**Purpose**: Validate workspace-based multi-environment setup
+**Purpose**: Validate workspace-based multi-environment setup with secure architecture
 
 ```bash
 # 1. Test development environment
 terraform workspace new dev-test
 terraform plan \
   -var="environment=dev" \
-  -var="enable_cloudfront=false"
+  -var="project_name=gif-storm-dev"
 
 # 2. Test production environment  
 terraform workspace new prod-test
 terraform plan \
   -var="environment=prod" \
-  -var="enable_cloudfront=true"
+  -var="project_name=gif-storm-prod" \
+  -var="bucket_name=company-gif-storm-prod-unique"
 
 # 3. Validate workspace isolation
 terraform workspace select dev-test
@@ -462,10 +560,151 @@ terraform output  # Should show dev outputs or empty
 terraform workspace select prod-test  
 terraform output  # Should show prod outputs or empty
 
-# 4. Cleanup workspaces
+# 4. Verify both use secure architecture
+terraform workspace select dev-test
+terraform plan | grep -E "(cloudfront|origin_access_control)"
+# Should show CloudFront and OAC resources
+
+terraform workspace select prod-test
+terraform plan | grep -E "(cloudfront|origin_access_control)"
+# Should show CloudFront and OAC resources
+
+# 5. Cleanup workspaces
 terraform workspace select default
 terraform workspace delete dev-test
 terraform workspace delete prod-test
+```
+
+### HTTPS Enforcement and OAC Testing
+
+#### Testing HTTPS Enforcement
+```bash
+#!/bin/bash
+# test-https-enforcement.sh
+
+WEBSITE_URL=$1
+if [ -z "$WEBSITE_URL" ]; then
+  echo "Usage: $0 <cloudfront-https-url>"
+  exit 1
+fi
+
+echo "=== Testing HTTPS Enforcement ==="
+
+# Test 1: HTTPS access works
+echo "Testing HTTPS access..."
+HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $WEBSITE_URL)
+echo "HTTPS Status: $HTTPS_STATUS"
+if [ "$HTTPS_STATUS" -eq 200 ] || [ "$HTTPS_STATUS" -eq 404 ]; then
+  echo "✓ HTTPS access working"
+else
+  echo "✗ HTTPS access failed"
+fi
+
+# Test 2: HTTP redirects to HTTPS
+echo "Testing HTTP to HTTPS redirect..."
+HTTP_URL=$(echo $WEBSITE_URL | sed 's/https:/http:/')
+REDIRECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HTTP_URL)
+echo "HTTP Redirect Status: $REDIRECT_STATUS"
+if [ "$REDIRECT_STATUS" -eq 301 ] || [ "$REDIRECT_STATUS" -eq 302 ]; then
+  echo "✓ HTTP properly redirects to HTTPS"
+else
+  echo "✗ HTTP redirect not working (status: $REDIRECT_STATUS)"
+fi
+
+# Test 3: Security headers
+echo "Testing security headers..."
+curl -s -I $WEBSITE_URL | grep -i "strict-transport-security\|x-frame-options\|x-content-type-options"
+echo "✓ Security headers check complete"
+```
+
+#### Testing Origin Access Control (OAC)
+```bash
+#!/bin/bash
+# test-oac-functionality.sh
+
+BUCKET_NAME=$1
+CLOUDFRONT_URL=$2
+
+if [ -z "$BUCKET_NAME" ] || [ -z "$CLOUDFRONT_URL" ]; then
+  echo "Usage: $0 <s3-bucket-name> <cloudfront-url>"
+  exit 1
+fi
+
+echo "=== Testing Origin Access Control (OAC) ==="
+
+# Test 1: Direct S3 access should be blocked
+echo "Testing direct S3 access (should be blocked)..."
+S3_DIRECT_URL="https://$BUCKET_NAME.s3.amazonaws.com/index.html"
+S3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $S3_DIRECT_URL)
+echo "Direct S3 Status: $S3_STATUS"
+if [ "$S3_STATUS" -eq 403 ]; then
+  echo "✓ Direct S3 access properly blocked"
+else
+  echo "✗ Direct S3 access not blocked (status: $S3_STATUS)"
+fi
+
+# Test 2: CloudFront can access S3 through OAC
+echo "Testing CloudFront access through OAC..."
+CF_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$CLOUDFRONT_URL/index.html")
+echo "CloudFront Status: $CF_STATUS"
+if [ "$CF_STATUS" -eq 200 ] || [ "$CF_STATUS" -eq 404 ]; then
+  echo "✓ CloudFront can access S3 through OAC"
+else
+  echo "✗ CloudFront cannot access S3 (status: $CF_STATUS)"
+fi
+
+# Test 3: Test different file types through OAC
+echo "Testing different file types through OAC..."
+TEST_FILES=("js/config.js" "css/styles.css" "gifs/3.gif")
+for file in "${TEST_FILES[@]}"; do
+  FILE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$CLOUDFRONT_URL/$file")
+  echo "File $file: $FILE_STATUS"
+done
+```
+
+#### Combined Security Test
+```bash
+#!/bin/bash
+# test-security-complete.sh
+
+set -e
+
+BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+WEBSITE_URL=$(terraform output -raw website_url)
+CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id)
+OAC_ID=$(terraform output -raw origin_access_control_id)
+
+echo "=== Complete Security Test ==="
+echo "Bucket: $BUCKET_NAME"
+echo "Website: $WEBSITE_URL"
+echo "CloudFront ID: $CLOUDFRONT_ID"
+echo "OAC ID: $OAC_ID"
+
+# Test HTTPS enforcement
+./test-https-enforcement.sh $WEBSITE_URL
+
+# Test OAC functionality
+./test-oac-functionality.sh $BUCKET_NAME $WEBSITE_URL
+
+# Test CloudFront configuration
+echo "=== CloudFront Configuration Test ==="
+aws cloudfront get-distribution --id $CLOUDFRONT_ID --query 'Distribution.DistributionConfig.Origins.Items[0].OriginAccessControlId' --output text
+if [ $? -eq 0 ]; then
+  echo "✓ CloudFront distribution has OAC configured"
+else
+  echo "✗ CloudFront distribution missing OAC"
+fi
+
+# Test S3 bucket policy
+echo "=== S3 Bucket Policy Test ==="
+aws s3api get-bucket-policy --bucket $BUCKET_NAME --query 'Policy' --output text | jq '.Statement[0].Condition'
+if [ $? -eq 0 ]; then
+  echo "✓ S3 bucket has OAC policy configured"
+else
+  echo "✗ S3 bucket policy missing or invalid"
+fi
+
+echo "=== Security Test Complete ==="
 ```
 
 ### Validation Test Scripts
@@ -489,8 +728,8 @@ echo "✓ Configuration is valid"
 # Test 2: Variable validation
 echo "Testing variable validation rules..."
 
-# Test invalid bucket names
-echo "Testing invalid bucket names..."
+# Test invalid variable values
+echo "Testing invalid variable values..."
 test_invalid_var() {
   local var_name=$1
   local var_value=$2
@@ -528,47 +767,50 @@ echo "✓ All validation rules working correctly"
 # Test 3: Valid configurations
 echo "Testing valid configurations..."
 
-# S3-only configuration
+# Development configuration (secure architecture)
 terraform plan \
   -var="aws_region=us-east-1" \
   -var="environment=dev" \
   -var="project_name=test-project" \
-  -var="enable_cloudfront=false" \
-  -out=s3-only.tfplan
+  -out=dev.tfplan
 
-echo "✓ S3-only configuration is valid"
+echo "✓ Development configuration is valid"
 
-# CloudFront configuration
+# Production configuration (secure architecture)
 terraform plan \
   -var="aws_region=us-west-2" \
   -var="environment=prod" \
   -var="project_name=test-project" \
-  -var="enable_cloudfront=true" \
-  -out=cloudfront.tfplan
+  -var="bucket_name=test-bucket-unique-name" \
+  -out=prod.tfplan
 
-echo "✓ CloudFront configuration is valid"
+echo "✓ Production configuration is valid"
 
-# Test 4: Resource count validation
-echo "Validating expected resource counts..."
+# Test 4: Resource count validation for secure architecture
+echo "Validating expected resource counts for secure architecture..."
 
-# Check S3-only plan
-s3_resources=$(terraform show -json s3-only.tfplan | jq '.planned_values.root_module.resources | length')
-if [ "$s3_resources" -eq 5 ]; then
-  echo "✓ S3-only plan has correct resource count (5)"
+# Check development plan (always includes CloudFront for security)
+dev_resources=$(terraform show -json dev.tfplan | jq '.planned_values.root_module.resources | length')
+if [ "$dev_resources" -eq 6 ]; then
+  echo "✓ Development plan has correct resource count (6) for secure architecture"
 else
-  echo "✗ S3-only plan has $s3_resources resources, expected 5"
+  echo "✗ Development plan has $dev_resources resources, expected 6 for secure architecture"
 fi
 
-# Check CloudFront plan
-cf_resources=$(terraform show -json cloudfront.tfplan | jq '.planned_values.root_module.resources | length')
-if [ "$cf_resources" -eq 6 ]; then
-  echo "✓ CloudFront plan has correct resource count (6)"
+# Check production plan (always includes CloudFront for security)
+prod_resources=$(terraform show -json prod.tfplan | jq '.planned_values.root_module.resources | length')
+if [ "$prod_resources" -eq 6 ]; then
+  echo "✓ Production plan has correct resource count (6) for secure architecture"
 else
-  echo "✗ CloudFront plan has $cf_resources resources, expected 6"
+  echo "✗ Production plan has $prod_resources resources, expected 6 for secure architecture"
 fi
+
+# Expected resources for secure architecture: S3 bucket, S3 public access block, S3 bucket policy, 
+# CloudFront OAC, CloudFront distribution, random_id
+echo "Expected resources for secure architecture: S3 bucket, S3 public access block, S3 bucket policy, CloudFront OAC, CloudFront distribution, random_id"
 
 # Cleanup
-rm -f s3-only.tfplan cloudfront.tfplan
+rm -f dev.tfplan prod.tfplan
 
 echo "=== All validation tests passed! ==="
 ```
@@ -605,7 +847,7 @@ echo "=== All validation tests passed! ==="
 #### End-to-End Deployment Test
 ```bash
 #!/bin/bash
-# e2e-test.sh - Complete deployment and functionality test
+# e2e-test.sh - Complete secure deployment and functionality test
 
 set -e
 
@@ -613,24 +855,25 @@ PROJECT_NAME="gif-storm-e2e-test"
 ENVIRONMENT="test"
 TIMESTAMP=$(date +%s)
 
-echo "=== Starting End-to-End Test ==="
+echo "=== Starting Secure End-to-End Test ==="
 
-# 1. Deploy infrastructure
-echo "Deploying test infrastructure..."
+# 1. Deploy secure infrastructure
+echo "Deploying secure test infrastructure (this takes 15-20 minutes)..."
 terraform apply -auto-approve \
   -var="project_name=${PROJECT_NAME}" \
-  -var="environment=${ENVIRONMENT}" \
-  -var="enable_cloudfront=false"
+  -var="environment=${ENVIRONMENT}"
 
 # 2. Get outputs
 BUCKET_NAME=$(terraform output -raw s3_bucket_name)
-WEBSITE_URL=$(terraform output -raw s3_website_url)
+WEBSITE_URL=$(terraform output -raw website_url)  # CloudFront HTTPS URL
+CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id)
 
-echo "Deployed to bucket: $BUCKET_NAME"
-echo "Website URL: $WEBSITE_URL"
+echo "Deployed to private bucket: $BUCKET_NAME"
+echo "Secure website URL: $WEBSITE_URL"
+echo "CloudFront distribution: $CLOUDFRONT_ID"
 
-# 3. Upload test content
-echo "Uploading test content..."
+# 3. Upload test content to private bucket
+echo "Uploading test content to private S3 bucket..."
 cd ..
 aws s3 sync . s3://$BUCKET_NAME/ \
   --exclude "*.md" \
@@ -638,36 +881,58 @@ aws s3 sync . s3://$BUCKET_NAME/ \
   --exclude ".git/*" \
   --exclude "terraform/*"
 
-# 4. Test website accessibility
-echo "Testing website accessibility..."
-sleep 10  # Wait for S3 to propagate
+# 4. Wait for CloudFront deployment to complete
+echo "Waiting for CloudFront deployment to complete..."
+aws cloudfront wait distribution-deployed --id $CLOUDFRONT_ID
+echo "✓ CloudFront deployment complete"
 
+# 5. Test secure website accessibility
+echo "Testing secure website accessibility..."
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $WEBSITE_URL)
 if [ "$HTTP_STATUS" -eq 200 ]; then
-  echo "✓ Website is accessible (HTTP $HTTP_STATUS)"
+  echo "✓ Secure website is accessible via HTTPS (HTTP $HTTP_STATUS)"
 else
   echo "✗ Website returned HTTP $HTTP_STATUS"
 fi
 
-# 5. Test specific files
-echo "Testing GIF file access..."
-GIF_URL="${WEBSITE_URL}/sample_gifs/3.gif"
+# 6. Test HTTPS enforcement
+echo "Testing HTTPS enforcement..."
+HTTP_URL=$(echo $WEBSITE_URL | sed 's/https:/http:/')
+REDIRECT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HTTP_URL)
+if [ "$REDIRECT_STATUS" -eq 301 ] || [ "$REDIRECT_STATUS" -eq 302 ]; then
+  echo "✓ HTTP redirects to HTTPS (HTTP $REDIRECT_STATUS)"
+else
+  echo "✗ HTTP redirect returned HTTP $REDIRECT_STATUS"
+fi
+
+# 7. Test specific files through CloudFront
+echo "Testing GIF file access through CloudFront..."
+GIF_URL="${WEBSITE_URL}/gifs/3.gif"
 GIF_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $GIF_URL)
 if [ "$GIF_STATUS" -eq 200 ]; then
-  echo "✓ GIF files are accessible (HTTP $GIF_STATUS)"
+  echo "✓ GIF files are accessible through CloudFront (HTTP $GIF_STATUS)"
 else
   echo "✗ GIF file returned HTTP $GIF_STATUS"
 fi
 
-# 6. Cleanup
+# 8. Verify S3 direct access is blocked
+echo "Verifying S3 direct access is blocked..."
+S3_DIRECT_URL="https://$BUCKET_NAME.s3.amazonaws.com/index.html"
+S3_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $S3_DIRECT_URL)
+if [ "$S3_STATUS" -eq 403 ]; then
+  echo "✓ Direct S3 access is properly blocked (HTTP $S3_STATUS)"
+else
+  echo "✗ S3 direct access returned HTTP $S3_STATUS (should be 403)"
+fi
+
+# 9. Cleanup
 echo "Cleaning up test resources..."
 cd terraform
 terraform destroy -auto-approve \
   -var="project_name=${PROJECT_NAME}" \
-  -var="environment=${ENVIRONMENT}" \
-  -var="enable_cloudfront=false"
+  -var="environment=${ENVIRONMENT}"
 
-echo "=== End-to-End Test Complete ==="
+echo "=== Secure End-to-End Test Complete ==="
 ```
 
 ### Performance Testing
@@ -699,9 +964,9 @@ wait
 # Test 3: GIF loading performance
 echo "Testing GIF loading performance..."
 GIF_URLS=(
-  "$WEBSITE_URL/sample_gifs/3.gif"
-  "$WEBSITE_URL/sample_gifs/4.gif"
-  "$WEBSITE_URL/sample_gifs/5.gif"
+  "$WEBSITE_URL/gifs/3.gif"
+  "$WEBSITE_URL/gifs/4.gif"
+  "$WEBSITE_URL/gifs/5.gif"
 )
 
 for gif_url in "${GIF_URLS[@]}"; do
@@ -755,19 +1020,20 @@ jobs:
         cd terraform
         terraform validate
         
-    - name: Terraform Plan (S3 Only)
+    - name: Terraform Plan (Development)
       run: |
         cd terraform
         terraform plan \
           -var="environment=ci-test" \
-          -var="enable_cloudfront=false"
+          -var="project_name=gif-storm-ci"
           
-    - name: Terraform Plan (CloudFront)
+    - name: Terraform Plan (Production)
       run: |
         cd terraform
         terraform plan \
-          -var="environment=ci-test" \
-          -var="enable_cloudfront=true"
+          -var="environment=ci-prod" \
+          -var="project_name=gif-storm-ci" \
+          -var="bucket_name=gif-storm-ci-prod-unique"
 
   security-scan:
     name: Security Scan
@@ -790,9 +1056,9 @@ jobs:
 - [ ] `terraform validate` passes
 - [ ] `terraform fmt -check` passes  
 - [ ] All variable validation rules tested
-- [ ] S3-only configuration plan reviewed
-- [ ] CloudFront configuration plan reviewed
-- [ ] Expected resource count verified
+- [ ] Secure architecture configuration plan reviewed
+- [ ] CloudFront and OAC configuration verified
+- [ ] Expected resource count verified (6 resources for secure architecture)
 - [ ] Cost estimation reviewed
 
 #### Post-Deployment Checklist
@@ -902,30 +1168,24 @@ For automated deployments, add to your CI/CD pipeline:
 
 ### Expected Monthly Costs
 
-#### S3-Only Configuration (Recommended for Most Use Cases)
-**Estimated Cost: $0.50 - $2.00/month**
-
-| Component | Usage | Cost |
-|-----------|-------|------|
-| S3 Standard Storage | 100MB website + GIFs | $0.02/month |
-| S3 Requests (GET) | 10,000 requests/month | $0.04/month |
-| Data Transfer Out | 1GB/month | $0.09/month |
-| **Total** | | **~$0.15/month** |
-
-*Note: Costs scale with traffic. High-traffic sites may reach $1-2/month.*
-
-#### S3 + CloudFront Configuration
+#### Secure CloudFront + Private S3 Configuration (Only Option)
 **Estimated Cost: $1.00 - $5.00/month**
 
 | Component | Usage | Cost |
 |-----------|-------|------|
 | S3 Standard Storage | 100MB website + GIFs | $0.02/month |
-| S3 Requests (reduced) | 1,000 requests/month | $0.004/month |
+| S3 Requests (minimal) | 1,000 requests/month | $0.004/month |
 | CloudFront Requests | 10,000 requests/month | $0.10/month |
 | CloudFront Data Transfer | 1GB/month | $0.085/month |
 | **Total** | | **~$0.21/month** |
 
-*Note: CloudFront reduces S3 costs but adds CDN costs. Break-even at ~5GB/month traffic.*
+**Cost Benefits of Mandatory CloudFront:**
+- **Reduced S3 costs**: CloudFront caching reduces S3 GET requests by ~90%
+- **No data transfer charges**: S3 to CloudFront transfers are free
+- **Global performance**: Edge locations reduce latency worldwide
+- **Security included**: HTTPS and private S3 access at no extra cost
+
+*Note: Costs scale with traffic. High-traffic sites may reach $2-5/month but benefit from better caching.*
 
 ### Cost Optimization Strategies
 
@@ -991,22 +1251,28 @@ default_ttl = 3600   # 1 hour cache
 max_ttl     = 86400  # 24 hour max cache
 ```
 
-#### 4. Traffic-Based Recommendations
+#### 4. Traffic-Based Cost Optimization
 
 **Low Traffic (< 1GB/month)**:
-- Use S3-only configuration
-- Skip CloudFront to avoid minimum charges
-- Expected cost: $0.15-0.50/month
+- CloudFront provides security and performance benefits
+- Minimal CloudFront charges due to low usage
+- Expected cost: $0.20-0.50/month
 
 **Medium Traffic (1-10GB/month)**:
-- Consider CloudFront for performance
-- Monitor costs monthly
+- CloudFront caching reduces S3 costs significantly
+- Optimal cost-performance balance
 - Expected cost: $0.50-2.00/month
 
 **High Traffic (> 10GB/month)**:
-- Use CloudFront for cost savings
-- Consider S3 Transfer Acceleration
+- CloudFront provides major cost savings vs direct S3
+- Global edge caching reduces origin load
 - Expected cost: $2.00-10.00/month
+
+**CloudFront Cost Optimization Tips:**
+- Use PriceClass_100 (US, Canada, Europe) for cost savings
+- Enable compression to reduce data transfer
+- Optimize cache TTL settings for static content
+- Monitor CloudFront usage reports for optimization opportunities
 
 ### Cost Monitoring Setup
 
@@ -1047,9 +1313,23 @@ Use AWS Cost Explorer with these filters:
 
 ### Cost Reduction Techniques
 
-#### 1. Minimize S3 Requests
+#### 1. Optimize CloudFront Caching
+Maximize cache hit ratio to reduce origin requests:
+```hcl
+# Current optimized settings in main.tf
+default_cache_behavior {
+  # Cache GIFs for 30 days (reduces S3 requests)
+  default_ttl = 2592000  # 30 days
+  max_ttl     = 31536000 # 1 year
+  
+  # Cache HTML for 1 hour (allows updates)
+  min_ttl = 0
+}
+```
+
+#### 2. Minimize S3 Storage Costs
 ```bash
-# Upload with optimized sync (reduces PUT requests)
+# Upload with optimized sync (reduces PUT requests and storage)
 aws s3 sync . s3://bucket-name/ \
   --delete \
   --exclude "*.md" \
@@ -1058,39 +1338,33 @@ aws s3 sync . s3://bucket-name/ \
   --exclude "terraform/*"
 ```
 
-#### 2. Optimize GIF Files
-Before uploading, optimize GIF files:
+#### 3. Optimize GIF Files
+Reduce storage and transfer costs by optimizing GIFs:
 ```bash
 # Install gifsicle for GIF optimization
 brew install gifsicle  # macOS
 apt-get install gifsicle  # Ubuntu
 
-# Optimize GIFs (reduces storage and transfer costs)
-find sample_gifs/ -name "*.gif" -exec gifsicle --optimize=3 --output={} {} \;
+# Optimize GIFs (reduces storage and CloudFront transfer costs)
+find gifs/ -name "*.gif" -exec gifsicle --optimize=3 --output={} {} \;
 ```
 
-#### 3. Enable S3 Intelligent Tiering (Optional)
-For mixed access patterns:
+#### 4. CloudFront Price Class Optimization
+The infrastructure uses cost-optimized settings:
+```hcl
+# Current cost-optimized configuration
+price_class = "PriceClass_100"  # US, Canada, Europe only
+compress    = true              # Reduces data transfer by ~70%
+```
+
+#### 5. Enable S3 Intelligent Tiering (Optional)
+For mixed access patterns on large GIF collections:
 ```hcl
 resource "aws_s3_bucket_intelligent_tiering_configuration" "website" {
   bucket = aws_s3_bucket.website.id
   name   = "EntireBucket"
 
   status = "Enabled"
-}
-```
-
-#### 4. CloudFront Cache Optimization
-Maximize cache hit ratio:
-```hcl
-# Optimize for static content
-default_cache_behavior {
-  # Cache GIFs for 7 days
-  default_ttl = 604800  # 7 days
-  max_ttl     = 2592000 # 30 days
-  
-  # Cache HTML for 1 hour
-  min_ttl = 0
 }
 ```
 

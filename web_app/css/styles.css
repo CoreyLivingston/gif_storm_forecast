@@ -8,6 +8,9 @@ body {
     background: #000;
     overflow: hidden;
     font-family: Arial, sans-serif;
+    /* Performance optimizations */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #slideshow-container {
@@ -19,6 +22,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* GPU acceleration for smooth transitions */
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 #gif-display {
@@ -26,15 +32,57 @@ body {
     max-height: 100vh;
     object-fit: contain;
     display: none;
+    /* Performance optimizations for image rendering */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    /* GPU acceleration */
+    transform: translateZ(0);
+    will-change: transform, opacity;
+    /* Prevent image dragging */
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+    /* Disable selection */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 #loading {
     color: white;
     font-size: 2rem;
     text-align: center;
+    /* GPU acceleration */
+    transform: translateZ(0);
 }
 
 /* Hide cursor after inactivity */
 body.hide-cursor {
     cursor: none;
+}
+
+/* Smooth transitions */
+#gif-display {
+    transition: opacity 0.1s ease-in-out;
+}
+
+/* Prevent text selection and context menus */
+body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Optimize for kiosk mode */
+@media screen {
+    body {
+        /* Prevent zoom */
+        touch-action: manipulation;
+    }
 }

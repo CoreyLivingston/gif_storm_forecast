@@ -2,9 +2,9 @@
 
 ## Core Technologies
 - **Frontend**: Vanilla JavaScript (ES6+), HTML5, CSS3
-- **Hosting**: AWS S3 static website hosting
-- **CDN**: AWS CloudFront (optional)
-- **Storage**: AWS S3 for GIF assets
+- **Hosting**: AWS CloudFront with HTTPS-only delivery
+- **CDN**: AWS CloudFront (mandatory for security)
+- **Storage**: Private AWS S3 bucket with Origin Access Control
 - **Infrastructure**: Terraform for Infrastructure-as-Code
 - **Development**: Local file system with sample GIFs, Devbox for environment management
 
@@ -20,7 +20,7 @@
 - `js/config.js` - Environment and behavior configuration
 - `js/slideshow.js` - Core slideshow logic as ES6 class
 - `css/styles.css` - Full-screen styling and responsive design
-- `sample_gifs/` - Local development assets
+- `gifs/` - Local development assets
 - `deploy/` - Manual AWS deployment scripts and policies
 - `terraform/` - Infrastructure-as-Code configuration
 - `devbox.json` - Development environment configuration
@@ -37,25 +37,28 @@ python3 -m http.server 8000
 # or
 npx serve .
 
-# Terraform deployment (recommended)
+# Secure HTTPS deployment (mandatory)
 cd terraform
 terraform init
 terraform apply
 BUCKET_NAME=$(terraform output -raw s3_bucket_name)
-cd .. && aws s3 sync . s3://$BUCKET_NAME/ --exclude "*.md" --exclude "deploy/*" --exclude ".git/*" --exclude "terraform/*"
+cd ../web_app && aws s3 sync . s3://$BUCKET_NAME/
 
-# Manual S3 deployment (legacy)
- aws s3 sync . s3://gif-storm-forecast-dev-59155a9e/ --exclude "*.md" --exclude "deploy/*" --exclude ".git/*" --exclude "terraform/*" --exclude ".kiro/*" --exclude "devbox.json" --exclude "devbox.lock" --exclude ".devbox/*"
+# Legacy manual deployment (deprecated - use Terraform instead)
+# Note: Manual deployment requires complex CloudFront and OAC setup
 ```
 
 ## Infrastructure Management
-- **Terraform**: Primary deployment method with cost optimization
+- **Terraform**: Primary deployment method with security and cost optimization
 - **Multi-environment**: Support for dev/staging/prod environments
-- **Cost-optimized**: S3-only (~$0.50-2.00/month) or S3+CloudFront configurations
+- **Secure HTTPS**: Mandatory CloudFront with private S3 (~$1-3/month)
 - **Validation**: Comprehensive variable validation and testing framework
 
 ## Configuration Management
 - Toggle between development/production via `CONFIG.DEVELOPMENT_MODE`
 - All timing and behavior controlled through `CONFIG` object
-- S3 bucket URL configurable for different environments
+- CloudFront HTTPS URL configurable for different environments
 - Terraform variables for infrastructure customization
+
+NEVER write shell scripts to apply terraform.
+Instead, provide documentation on how to run terraform commands.

@@ -1,10 +1,11 @@
-# Example Terraform variables configuration
+# Example Terraform variables configuration for secure GIF Storm Forecast deployment
 # Copy this file to terraform.tfvars and customize the values
 
 # S3 bucket name (optional - will be auto-generated if not provided)
+# The bucket will be configured as private with no public access
 # bucket_name = "my-gif-storm-forecast-bucket"
 
-# AWS region for deployment
+# AWS region for secure infrastructure deployment
 aws_region = "us-east-1"
 
 # Environment name for tagging and resource naming
@@ -13,21 +14,23 @@ environment = "dev"
 # Project name for resource naming and tagging
 project_name = "gif-storm-forecast"
 
-# Enable CloudFront CDN for improved performance and HTTPS
-# Note: CloudFront deployment takes 15+ minutes and incurs additional costs
-enable_cloudfront = false
+# SECURITY NOTE: CloudFront CDN is now MANDATORY for all deployments
+# - Provides HTTPS-only access (HTTP requests are redirected to HTTPS)
+# - Enables secure Origin Access Control (OAC) to private S3 bucket
+# - Blocks all direct public access to S3 bucket
+# - CloudFront deployment takes 15+ minutes but ensures security compliance
 
-# Example configurations for different environments:
+# Example configurations for different secure environments:
 
-# Development environment (minimal cost)
+# Development environment (secure with mandatory CloudFront)
 # environment = "dev"
-# enable_cloudfront = false
-
-# Staging environment (with CDN for testing)
-# environment = "staging"
-# enable_cloudfront = true
-
-# Production environment (with CDN for performance)
-# environment = "prod"
-# enable_cloudfront = true
 # aws_region = "us-east-1"
+
+# Staging environment (secure with mandatory CloudFront)
+# environment = "staging"
+# aws_region = "us-west-2"
+
+# Production environment (secure with mandatory CloudFront)
+# environment = "prod"
+# aws_region = "us-east-1"
+# bucket_name = "gif-storm-forecast-prod-static-site"

@@ -33,3 +33,6 @@ terraform/.terraform/
 terraform/.terraform.lock.hcl
 terraform/terraform.tfvars
 terraform/*.tfplan
+
+# Signal CLI configuration (contains sensitive data)
+signal-cli-config/

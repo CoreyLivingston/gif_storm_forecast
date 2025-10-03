@@ -1,5 +1,5 @@
 variable "bucket_name" {
-  description = "Name of the S3 bucket for static website hosting. If not provided, a unique name will be generated."
+  description = "Name of the private S3 bucket for secure static website hosting. If not provided, a unique name will be generated. The bucket will be configured with no public access and only accessible through CloudFront."
   type        = string
   default     = null
 
@@ -23,7 +23,7 @@ variable "bucket_name" {
 }
 
 variable "aws_region" {
-  description = "AWS region for resource deployment"
+  description = "AWS region for secure infrastructure deployment. All resources including the private S3 bucket and CloudFront distribution will be deployed in this region."
   type        = string
   default     = "us-east-1"
 
@@ -41,7 +41,7 @@ variable "aws_region" {
       "me-south-1", "me-central-1",
       "il-central-1"
     ], var.aws_region)
-    error_message = "AWS region must be a valid region where S3 static website hosting is supported. See AWS documentation for current list of supported regions."
+    error_message = "AWS region must be a valid region where CloudFront and S3 are supported. See AWS documentation for current list of supported regions."
   }
 
   validation {
@@ -50,14 +50,10 @@ variable "aws_region" {
   }
 }
 
-variable "enable_cloudfront" {
-  description = "Enable CloudFront CDN for improved performance and HTTPS support"
-  type        = bool
-  default     = false
-}
+
 
 variable "environment" {
-  description = "Environment name for resource tagging (e.g., dev, staging, prod)"
+  description = "Environment name for secure resource tagging and naming (e.g., dev, staging, prod). Used to organize resources and apply security-focused deployment configurations."
   type        = string
   default     = "dev"
 
@@ -80,7 +76,7 @@ variable "environment" {
 }
 
 variable "project_name" {
-  description = "Project name for resource naming and tagging"
+  description = "Project name for secure resource naming and tagging. Used as a prefix for all resources in the secure architecture with mandatory CloudFront and private S3 configuration."
   type        = string
   default     = "gif-storm-forecast"
 
@@ -97,5 +93,16 @@ variable "project_name" {
   validation {
     condition = !can(regex("^(aws|amazon|s3|cloudfront|terraform)", var.project_name))
     error_message = "Project name cannot start with reserved prefixes: aws, amazon, s3, cloudfront, terraform."
+  }
+}
+
+variable "gif_cache_control" {
+  description = "Cache control settings for GIF files. Set to 'no-cache' to ensure browsers always fetch fresh content, or 'max-age=3600' for 1-hour caching."
+  type        = string
+  default     = "no-cache, no-store, must-revalidate"
+
+  validation {
+    condition = can(regex("^(no-cache|max-age=\\d+|no-store|must-revalidate|public|private)(,\\s*(no-cache|max-age=\\d+|no-store|must-revalidate|public|private))*$", var.gif_cache_control))
+    error_message = "Cache control must be valid HTTP cache-control directive(s), e.g., 'no-cache', 'max-age=3600', or 'no-cache, no-store, must-revalidate'."
   }
 }

@@ -8,8 +8,8 @@
 ├── js/
 │   ├── config.js          # Configuration constants and environment settings
 │   └── slideshow.js       # Core slideshow class and logic
-├── sample_gifs/           # Local development GIF assets
-│   ├── 1.gif, 3.gif, etc # Sample GIFs for testing
+├── gifs/                  # Local development GIF assets
+│   ├── 1.gif through 10.gif # Sample GIFs for testing
 ├── deploy/                # Manual AWS deployment configuration (legacy)
 │   ├── s3-setup.md       # Manual deployment instructions
 │   └── bucket-policy.json # S3 bucket policy template
@@ -54,14 +54,14 @@
 ### File Naming
 - Kebab-case for HTML/CSS files and directories
 - camelCase for JavaScript variables and functions
-- Numbered GIF files (1.gif, 3.gif, etc.)
+- Numbered GIF files (1.gif through 10.gif)
 - Descriptive names for configuration files
 - snake_case for Terraform variables and resources
 
 ## Deployment Patterns
 
 ### Development Environment
-- Local mode: serves from `./sample_gifs/` directory
+- Local mode: serves from `./gifs/` directory
 - Devbox environment with pre-configured tools
 - S3-only infrastructure for cost optimization
 

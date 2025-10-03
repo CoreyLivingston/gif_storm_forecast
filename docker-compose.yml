@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  signal-cli-rest-api:
+    image: bbernhard/signal-cli-rest-api:latest
+    container_name: gif-storm-signal-api
+    environment:
+      - MODE=native  # Using native mode for better performance
+      - PORT=8080
+      - LOG_LEVEL=info
+    ports:
+      - "8080:8080"  # Map container port 8080 to host port 8080
+    volumes:
+      - "./signal-cli-config:/home/.local/share/signal-cli"  # Persist signal configuration
+    restart: unless-stopped
+    networks:
+      - gif-storm-network
+
+networks:
+  gif-storm-network:
+    driver: bridge

@@ -1,43 +1,43 @@
+# Primary website access - HTTPS-only via CloudFront
+output "website_url" {
+  description = "Primary HTTPS website URL via CloudFront"
+  value       = "https://${aws_cloudfront_distribution.website.domain_name}"
+}
+
+# S3 bucket for content upload reference (private bucket, no direct access)
 output "s3_bucket_name" {
-  description = "Name of the created S3 bucket"
+  description = "Name of the created S3 bucket for content uploads"
   value       = aws_s3_bucket.website.id
 }
 
-output "s3_website_endpoint" {
-  description = "S3 website endpoint URL"
-  value       = aws_s3_bucket_website_configuration.website.website_endpoint
-}
-
-output "s3_website_url" {
-  description = "Complete S3 website URL (HTTP)"
-  value       = "http://${aws_s3_bucket_website_configuration.website.website_endpoint}"
-}
-
+# CloudFront distribution details
 output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID (only when CloudFront is enabled)"
-  value       = var.enable_cloudfront ? aws_cloudfront_distribution.website[0].id : null
+  description = "CloudFront distribution ID"
+  value       = aws_cloudfront_distribution.website.id
 }
 
 output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name (only when CloudFront is enabled)"
-  value       = var.enable_cloudfront ? aws_cloudfront_distribution.website[0].domain_name : null
+  description = "CloudFront distribution domain name"
+  value       = aws_cloudfront_distribution.website.domain_name
 }
 
-output "cloudfront_url" {
-  description = "Complete CloudFront URL with HTTPS (only when CloudFront is enabled)"
-  value       = var.enable_cloudfront ? "https://${aws_cloudfront_distribution.website[0].domain_name}" : null
+# Origin Access Control for secure CloudFront-S3 integration
+output "origin_access_control_id" {
+  description = "Origin Access Control ID for CloudFront-S3 integration"
+  value       = aws_cloudfront_origin_access_control.website.id
 }
 
 output "deployment_instructions" {
-  description = "Instructions for uploading website content"
+  description = "Instructions for uploading website content to secure infrastructure"
   value = <<-EOT
-    To deploy your website content:
+    To deploy your website content to the secure infrastructure:
     
-    1. Upload files to S3 bucket: ${aws_s3_bucket.website.id}
+    1. Upload files to private S3 bucket: ${aws_s3_bucket.website.id}
        aws s3 sync . s3://${aws_s3_bucket.website.id}/ --exclude "*.md" --exclude "deploy/*" --exclude ".git/*" --exclude "terraform/*"
     
-    2. Access your website at:
-       S3 Website URL: http://${aws_s3_bucket_website_configuration.website.website_endpoint}
-       ${var.enable_cloudfront ? "CloudFront URL: https://${aws_cloudfront_distribution.website[0].domain_name}" : ""}
+    2. Access your secure website at:
+       HTTPS URL: https://${aws_cloudfront_distribution.website.domain_name}
+       
+    Note: The S3 bucket is private and only accessible through CloudFront with HTTPS.
   EOT
 }

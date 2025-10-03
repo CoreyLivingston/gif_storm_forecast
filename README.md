@@ -10,9 +10,11 @@ This project creates a static web application that displays GIFs from an S3 buck
 
 - **Full-screen display**: GIFs are displayed in full-screen mode for maximum visual impact
 - **Automatic progression**: Each GIF plays 3 complete loops before moving to the next
-- **S3 integration**: GIFs are stored and served from an AWS S3 bucket
+- **Secure HTTPS delivery**: All content served through CloudFront with mandatory HTTPS
+- **Private S3 storage**: GIFs stored securely in private S3 bucket with Origin Access Control
 - **Static web app**: Lightweight, client-side application with no server requirements
 - **Continuous loop**: Slideshow runs indefinitely, cycling through all available GIFs
+- **Global CDN**: Fast loading worldwide through CloudFront edge locations
 
 ## How it works
 
@@ -22,64 +24,54 @@ This project creates a static web application that displays GIFs from an S3 buck
 4. After 3 complete animation cycles, the app automatically advances to the next GIF
 5. The slideshow continues indefinitely, looping back to the first GIF after the last one
 
-## Deployment Options
+## Quick Deployment
 
-### Option 1: Terraform Infrastructure (Recommended)
+### Secure HTTPS Deployment
 
-Deploy the application using Infrastructure-as-Code with Terraform for automated, consistent deployments.
+The application is deployed with mandatory HTTPS through CloudFront CDN for security and performance:
 
-**Quick Start:**
 ```bash
-# Navigate to terraform directory
+# 1. Configure Terraform (optional customization)
 cd terraform
-
-# Configure your deployment
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your preferred settings
+# Edit terraform.tfvars to customize bucket name, region, or environment
 
-# Deploy infrastructure
+# 2. Deploy secure infrastructure
 terraform init
 terraform apply
 
-# Upload website content
+# 3. Upload your GIFs and website files
 BUCKET_NAME=$(terraform output -raw s3_bucket_name)
-cd ..
-aws s3 sync . s3://$BUCKET_NAME/ --exclude "*.md" --exclude "deploy/*" --exclude ".git/*" --exclude "terraform/*"
+cd ../web_app
+aws s3 sync . s3://$BUCKET_NAME/
 
-# Get your website URL
-cd terraform
-terraform output s3_website_url
+# 4. Access your secure HTTPS website
+cd ../terraform
+terraform output website_url
 ```
 
-**Benefits:**
-- Automated infrastructure provisioning with repeatable deployments
-- Cost-optimized configuration (~$0.50-2.00/month for S3-only)
-- Optional CloudFront CDN for improved performance and HTTPS
-- Multi-environment support (dev/staging/prod)
-- Easy cleanup with `terraform destroy`
+### Security Benefits
 
-**Configuration Options:**
-- **Development**: S3-only hosting for minimal cost
-- **Production**: S3 + CloudFront for performance optimization
-- **Custom**: Configurable regions, naming, and features
+- **HTTPS-Only Access**: All content is served securely through CloudFront with automatic HTTP to HTTPS redirection
+- **Private S3 Storage**: Content is stored in a private S3 bucket with no public access
+- **Origin Access Control**: CloudFront uses AWS's latest security model to access S3 content
+- **Cost-Optimized**: Efficient CloudFront configuration keeps costs minimal (~$1-3/month)
 
-📖 **For complete setup instructions, configuration options, and troubleshooting, see the [Terraform README](terraform/README.md).**
+## Performance & Security
 
-### Option 2: Manual AWS CLI Deployment
+The application is optimized for performance and security:
 
-For simple deployments or learning purposes, you can deploy manually using the AWS CLI.
+1. **HTTPS Delivery**: All content is automatically served over HTTPS through CloudFront
+2. **Global CDN**: CloudFront edge locations provide fast loading worldwide
+3. **Secure Storage**: Private S3 bucket prevents unauthorized access to your content
+4. **Optimized Caching**: CloudFront caching reduces load times and bandwidth costs
 
-**Prerequisites:**
-- AWS CLI installed and configured
-- S3 bucket created for static website hosting
+### Troubleshooting
 
-**Deployment Steps:**
-```bash
-# Upload files to your S3 bucket
-aws s3 sync . s3://your-bucket-name/ --exclude "*.md" --exclude "deploy/*" --exclude ".git/*"
+If you're experiencing issues:
 
-# Configure bucket for static website hosting
-aws s3 website s3://your-bucket-name --index-document index.html --error-document index.html
-```
+1. **Check your config**: Ensure `DEVELOPMENT_MODE = false` in `js/config.js` for production
+2. **Optimize GIFs**: Keep GIF files under 10MB for better performance
+3. **CloudFront Propagation**: Allow 15-20 minutes for CloudFront deployment to complete
 
-For detailed manual deployment instructions, see [deploy/s3-setup.md](deploy/s3-setup.md).
+📖 **For detailed setup and troubleshooting, see [terraform/README.md](terraform/README.md)**

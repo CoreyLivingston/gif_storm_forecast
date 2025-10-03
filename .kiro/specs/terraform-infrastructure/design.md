@@ -2,29 +2,24 @@
 
 ## Overview
 
-This design outlines the Terraform infrastructure-as-code solution for deploying the GIF Storm Forecast application as a cost-effective static website on AWS. The solution focuses on a simple S3-only setup for minimal cost and maximum simplicity, with an optional CloudFront CDN for improved performance if needed.
+This design outlines the Terraform infrastructure-as-code solution for deploying the GIF Storm Forecast application as a secure static website on AWS. The solution uses a private S3 bucket for content storage with mandatory CloudFront distribution for HTTPS-only content delivery, implementing Origin Access Control (OAC) for secure access.
 
-The infrastructure follows AWS best practices for static website hosting while prioritizing cost optimization and ease of deployment. The design uses modular Terraform configuration with clear variable definitions and comprehensive outputs.
+The infrastructure follows AWS security best practices by eliminating public S3 access and enforcing HTTPS-only delivery. The design uses modular Terraform configuration with comprehensive security controls and clear variable definitions.
 
 ## Architecture
 
-### Primary Architecture (S3 Only)
+### Secure Architecture (CloudFront + Private S3)
 ```
-Internet → S3 Bucket (Static Website Hosting) → GIF Storm Forecast App
-```
-
-### Optional Enhanced Architecture (S3 + CloudFront)
-```
-Internet → CloudFront Distribution → S3 Bucket → GIF Storm Forecast App
+Internet → CloudFront Distribution (HTTPS) → Origin Access Control → Private S3 Bucket → GIF Storm Forecast App
 ```
 
 ### Key Components
 
-1. **S3 Bucket**: Primary storage for static website files and GIF assets
-2. **S3 Bucket Policy**: Public read access for website content
-3. **S3 Website Configuration**: Static website hosting with index document
-4. **CloudFront Distribution** (Optional): CDN for performance optimization only
-5. **Origin Access Control** (Optional): Secure S3 access when using CloudFront
+1. **Private S3 Bucket**: Secure storage for static website files and GIF assets (no public access)
+2. **CloudFront Distribution**: Mandatory CDN for HTTPS content delivery and performance
+3. **Origin Access Control (OAC)**: Secure authentication between CloudFront and S3
+4. **S3 Bucket Policy**: Restrictive policy allowing only CloudFront OAC access
+5. **CloudFront Security Headers**: HTTPS enforcement and security best practices
 
 ## Components and Interfaces
 
@@ -50,35 +45,37 @@ terraform/
   - Force destroy enabled for easy cleanup
   - Appropriate tags for cost tracking
 
-#### S3 Website Configuration
-- **Resource**: `aws_s3_bucket_website_configuration`
-- **Purpose**: Enable static website hosting
-- **Configuration**:
-  - Index document: `index.html`
-  - Error document: `index.html` (SPA behavior)
-
-#### S3 Public Access Configuration
+#### S3 Public Access Block
 - **Resource**: `aws_s3_bucket_public_access_block`
-- **Purpose**: Allow public read access for website hosting
+- **Purpose**: Block all public access to ensure security
 - **Configuration**:
-  - Disable block public ACLs and policies for website access
-  - Maintain security best practices
+  - Enable all public access block settings
+  - Prevent any public access to bucket or objects
+
+#### Origin Access Control
+- **Resource**: `aws_cloudfront_origin_access_control`
+- **Purpose**: Secure authentication between CloudFront and S3
+- **Configuration**:
+  - Origin type: S3
+  - Signing behavior: Always sign requests
+  - Signing protocol: sigv4
 
 #### S3 Bucket Policy
 - **Resource**: `aws_s3_bucket_policy`
-- **Purpose**: Grant public read access to website content
+- **Purpose**: Grant access only to CloudFront via OAC
 - **Configuration**:
-  - Allow `s3:GetObject` for all objects in bucket
-  - Principal: `*` (public access)
+  - Allow `s3:GetObject` for CloudFront OAC identity only
+  - Principal: CloudFront service with OAC condition
 
-#### CloudFront Distribution (Optional)
+#### CloudFront Distribution (Mandatory)
 - **Resource**: `aws_cloudfront_distribution`
-- **Purpose**: CDN for performance optimization
+- **Purpose**: Secure HTTPS content delivery and performance optimization
 - **Configuration**:
-  - Origin: S3 website endpoint
+  - Origin: S3 bucket domain name (not website endpoint)
+  - Origin Access Control: Configured OAC identity
   - Price class: `PriceClass_100` (cost-optimized)
   - Default root object: `index.html`
-  - Viewer protocol policy: `allow-all` (HTTP and HTTPS both allowed)
+  - Viewer protocol policy: `redirect-to-https` (HTTPS enforcement)
 
 ### Variable Interface
 
@@ -95,11 +92,7 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "enable_cloudfront" {
-  description = "Enable CloudFront CDN for improved performance (optional)"
-  type        = bool
-  default     = false
-}
+# CloudFront is now mandatory - no enable_cloudfront variable needed
 
 variable "environment" {
   description = "Environment name for resource tagging"
@@ -122,29 +115,24 @@ output "s3_bucket_name" {
   value       = aws_s3_bucket.website.id
 }
 
-output "s3_website_endpoint" {
-  description = "S3 website endpoint URL"
-  value       = aws_s3_bucket_website_configuration.website.website_endpoint
-}
-
-output "s3_website_url" {
-  description = "Complete S3 website URL"
-  value       = "http://${aws_s3_bucket_website_configuration.website.website_endpoint}"
+output "website_url" {
+  description = "Primary HTTPS website URL via CloudFront"
+  value       = "https://${aws_cloudfront_distribution.website.domain_name}"
 }
 
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID"
-  value       = var.enable_cloudfront ? aws_cloudfront_distribution.website[0].id : null
+  value       = aws_cloudfront_distribution.website.id
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFront distribution domain name"
-  value       = var.enable_cloudfront ? aws_cloudfront_distribution.website[0].domain_name : null
+  value       = aws_cloudfront_distribution.website.domain_name
 }
 
-output "cloudfront_url" {
-  description = "Complete CloudFront URL"
-  value       = var.enable_cloudfront ? "http://${aws_cloudfront_distribution.website[0].domain_name}" : null
+output "origin_access_control_id" {
+  description = "Origin Access Control ID for CloudFront-S3 integration"
+  value       = aws_cloudfront_origin_access_control.website.id
 }
 ```
 
@@ -173,12 +161,13 @@ output "cloudfront_url" {
 - **Versioning**: Disabled to reduce storage costs
 - **Transfer Acceleration**: Disabled (not needed for static hosting)
 
-#### CloudFront Configuration (When Enabled)
+#### CloudFront Configuration (Always Enabled)
 - **Price Class**: `PriceClass_100` (US, Canada, Europe only)
 - **Caching**: Optimized for static content with long TTL
-- **Compression**: Enabled for text-based files
+- **Compression**: Enabled for text-based files, disabled for GIFs
 - **Origin Shield**: Disabled (not cost-effective for small sites)
-- **Protocol**: HTTP allowed (no HTTPS requirement)
+- **Protocol**: HTTPS enforced (HTTP redirects to HTTPS)
+- **Origin Access Control**: Secure S3 access without public permissions
 
 ## Error Handling
 
@@ -208,10 +197,10 @@ output "cloudfront_url" {
 
 ```hcl
 # Explicit dependency chain
-aws_s3_bucket → aws_s3_bucket_website_configuration
 aws_s3_bucket → aws_s3_bucket_public_access_block
-aws_s3_bucket → aws_s3_bucket_policy
-aws_s3_bucket → aws_cloudfront_distribution (if enabled)
+aws_cloudfront_origin_access_control → aws_s3_bucket_policy
+aws_cloudfront_origin_access_control → aws_cloudfront_distribution
+aws_s3_bucket → aws_cloudfront_distribution
 ```
 
 ## Testing Strategy
@@ -224,16 +213,16 @@ aws_s3_bucket → aws_cloudfront_distribution (if enabled)
    - Variable validation rules for required inputs
 
 2. **Resource Creation Tests**
-   - S3 bucket creation and configuration
-   - Website hosting enablement
-   - Public access configuration
-   - CloudFront distribution (when enabled)
+   - S3 bucket creation with private access
+   - Origin Access Control creation
+   - CloudFront distribution deployment
+   - S3 bucket policy with OAC permissions
 
 3. **Functional Tests**
-   - S3 website endpoint accessibility
-   - CloudFront distribution functionality (when enabled)
-   - HTTP content delivery verification
-   - GIF loading and display functionality
+   - CloudFront HTTPS endpoint accessibility
+   - Origin Access Control functionality
+   - HTTPS enforcement (HTTP redirect) verification
+   - GIF loading and display functionality through CloudFront
 
 ### Cost Validation
 
@@ -255,9 +244,10 @@ aws_s3_bucket → aws_cloudfront_distribution (if enabled)
    - Validate CloudFront origin access control
 
 2. **Content Delivery Validation**
-   - Test HTTP content delivery
-   - Verify CloudFront caching behavior (when enabled)
-   - Validate static asset loading
+   - Test HTTPS-only content delivery
+   - Verify CloudFront caching behavior
+   - Validate static asset loading through OAC
+   - Confirm direct S3 access is blocked
 
 ### Deployment Testing
 
